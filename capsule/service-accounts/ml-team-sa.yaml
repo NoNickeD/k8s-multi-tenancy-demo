@@ -1,0 +1,11 @@
+---
+# Service Account for ML Team
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-team-user
+  namespace: default
+  annotations:
+    description: "Service account for testing ml-team tenant isolation"
+
+# Note: No explicit RBAC needed - Capsule automatically grants permissions to tenant owners

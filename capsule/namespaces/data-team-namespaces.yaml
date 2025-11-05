@@ -1,0 +1,23 @@
+---
+# Data Team - Development Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-team-dev
+  labels:
+    capsule.clastix.io/tenant: data-team
+    environment: development
+  annotations:
+    capsule.clastix.io/tenant: data-team
+
+---
+# Data Team - Production Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-team-prod
+  labels:
+    capsule.clastix.io/tenant: data-team
+    environment: production
+  annotations:
+    capsule.clastix.io/tenant: data-team

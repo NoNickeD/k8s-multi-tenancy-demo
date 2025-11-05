@@ -1,0 +1,23 @@
+---
+# ML Team - Development Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-team-dev
+  labels:
+    capsule.clastix.io/tenant: ml-team
+    environment: development
+  annotations:
+    capsule.clastix.io/tenant: ml-team
+
+---
+# ML Team - Staging Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-team-staging
+  labels:
+    capsule.clastix.io/tenant: ml-team
+    environment: staging
+  annotations:
+    capsule.clastix.io/tenant: ml-team

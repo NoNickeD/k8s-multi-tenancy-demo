@@ -1,0 +1,35 @@
+---
+# Platform Team - Development Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-team-dev
+  labels:
+    capsule.clastix.io/tenant: platform-team
+    environment: development
+  annotations:
+    capsule.clastix.io/tenant: platform-team
+
+---
+# Platform Team - Staging Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-team-staging
+  labels:
+    capsule.clastix.io/tenant: platform-team
+    environment: staging
+  annotations:
+    capsule.clastix.io/tenant: platform-team
+
+---
+# Platform Team - Production Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-team-prod
+  labels:
+    capsule.clastix.io/tenant: platform-team
+    environment: production
+  annotations:
+    capsule.clastix.io/tenant: platform-team

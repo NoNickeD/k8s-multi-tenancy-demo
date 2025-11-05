@@ -1,0 +1,23 @@
+controlPlane:
+  distro:
+    k3s:
+      enabled: true
+      image:
+        tag: "v1.33.3-k3s1"  # Match host cluster version
+  statefulSet:
+    resources:
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+    scheduling:
+      nodeSelector:
+        workload-type: vcluster-control-plane
+        tenant-mode: hard-isolation
+    persistence:
+      volumeClaim:
+        enabled: true
+        size: 10Gi
+        storageClass: managed-premium

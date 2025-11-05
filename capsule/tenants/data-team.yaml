@@ -1,0 +1,124 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: data-team
+spec:
+  # Tenant owners (Azure AD group)
+  owners:
+    - name: data-engineers
+      kind: Group
+
+  # Limit to 3 namespaces per tenant
+  namespaceOptions:
+    quota: 3
+
+  # Node selector - force pods to run on Capsule node pool
+  nodeSelector:
+    tenant-mode: soft-isolation
+
+  # Default resource limits for every container
+  limitRanges:
+    items:
+      - limits:
+          - type: Container
+            default:
+              cpu: "2"
+              memory: "4Gi"
+            defaultRequest:
+              cpu: "500m"
+              memory: "512Mi"
+            max:
+              cpu: "8"
+              memory: "16Gi"
+            min:
+              cpu: "100m"
+              memory: "128Mi"
+
+  # Aggregate quota across all namespaces in this tenant
+  resourceQuotas:
+    items:
+      - hard:
+          limits.cpu: "60"
+          limits.memory: "120Gi"
+          requests.cpu: "30"
+          requests.memory: "60Gi"
+          requests.storage: "1Ti"
+          persistentvolumeclaims: "30"
+          pods: "150"
+          services: "30"
+
+  # Network isolation
+  networkPolicies:
+    items:
+      - policyTypes:
+          - Ingress
+          - Egress
+        podSelector: {}
+        ingress:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    capsule.clastix.io/tenant: data-team
+        egress:
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    capsule.clastix.io/tenant: data-team
+          # Allow DNS
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+            ports:
+              - protocol: UDP
+                port: 53
+          # Allow external access (for data ingestion)
+          - to:
+              - podSelector: {}
+            ports:
+              - protocol: TCP
+                port: 443
+              - protocol: TCP
+                port: 80
+              - protocol: TCP
+                port: 5432  # PostgreSQL
+              - protocol: TCP
+                port: 27017  # MongoDB
+
+  # Restrict ingress hostnames
+  ingressOptions:
+    allowedHostnames:
+      allowedRegex: ".*\\.data-team\\.srekubecraft\\.io$"
+
+  # Storage classes
+  storageClasses:
+    allowed:
+      - managed-premium
+      - managed-csi
+      - azurefile-premium
+
+  # Container registries
+  containerRegistries:
+    allowed:
+      - "acr*.azurecr.io"
+      - "docker.io"
+      - "ghcr.io"
+      - "quay.io"
+
+  # Service account metadata
+  serviceOptions:
+    additionalMetadata:
+      annotations:
+        prometheus.io/scrape: "true"
+      labels:
+        tenant: data-team
+        cost-center: "data-analytics"
+        managed-by: "capsule"
+
+  # Pod Security Standards
+  podOptions:
+    additionalMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/audit: baseline
+        pod-security.kubernetes.io/warn: restricted

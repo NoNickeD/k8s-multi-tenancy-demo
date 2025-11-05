@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: capsule
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://projectcapsule.github.io/charts
+    chart: capsule
+    targetRevision: 0.7.2  # Latest stable version
+    helm:
+      releaseName: capsule
+      values: |
+        manager:
+          options:
+            # Force tenant prefix on namespace names to avoid conflicts
+            forceTenantPrefix: "true"
+            # Enable capsule to manage storage classes and service accounts
+            capsuleUserGroups:
+              - projectcapsule.dev
+              - system:serviceaccounts:default
+            # Protected namespaces regex - cannot be managed by tenants
+            protectedNamespaceRegex: "^(kube-system|kube-public|kube-node-lease|capsule-system|argocd|monitoring|prometheus|grafana|cert-manager|external-secrets)$"
+
+          # Resource limits for Capsule manager
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+          # Node selector to run on system node pool
+          nodeSelector:
+            nodepool-type: system
+
+          # Tolerations
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+
+          # RBAC
+          rbac:
+            create: true
+
+        # Service monitor for Prometheus
+        monitoring:
+          serviceMonitor:
+            enabled: true
+            labels:
+              release: prometheus
+
+        # Service Account
+        serviceAccount:
+          create: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: capsule-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

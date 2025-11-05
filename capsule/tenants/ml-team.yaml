@@ -1,0 +1,123 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: ml-team
+spec:
+  # Tenant owners (Azure AD group)
+  owners:
+    - name: ml-engineers
+      kind: Group
+
+  # Limit to 4 namespaces per tenant
+  namespaceOptions:
+    quota: 4
+
+  # Node selector - force pods to run on Capsule node pool
+  nodeSelector:
+    tenant-mode: soft-isolation
+
+  # Higher resource limits for ML workloads
+  limitRanges:
+    items:
+      - limits:
+          - type: Container
+            default:
+              cpu: "4"
+              memory: "8Gi"
+            defaultRequest:
+              cpu: "1"
+              memory: "2Gi"
+            max:
+              cpu: "16"
+              memory: "32Gi"
+            min:
+              cpu: "100m"
+              memory: "256Mi"
+
+  # Higher quota for ML workloads
+  resourceQuotas:
+    items:
+      - hard:
+          limits.cpu: "100"
+          limits.memory: "200Gi"
+          requests.cpu: "50"
+          requests.memory: "100Gi"
+          requests.storage: "2Ti"
+          persistentvolumeclaims: "50"
+          pods: "100"
+          services: "20"
+          requests.nvidia.com/gpu: "4"  # GPU quota
+
+  # Network isolation
+  networkPolicies:
+    items:
+      - policyTypes:
+          - Ingress
+          - Egress
+        podSelector: {}
+        ingress:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    capsule.clastix.io/tenant: ml-team
+        egress:
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    capsule.clastix.io/tenant: ml-team
+          # Allow DNS
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+            ports:
+              - protocol: UDP
+                port: 53
+          # Allow external access for model downloads
+          - to:
+              - podSelector: {}
+            ports:
+              - protocol: TCP
+                port: 443
+              - protocol: TCP
+                port: 80
+
+  # Restrict ingress hostnames
+  ingressOptions:
+    allowedHostnames:
+      allowedRegex: ".*\\.ml-team\\.srekubecraft\\.io$"
+
+  # Storage classes - premium for ML workloads
+  storageClasses:
+    allowed:
+      - managed-premium
+      - managed-csi
+      - azurefile-premium
+
+  # Container registries
+  containerRegistries:
+    allowed:
+      - "acr*.azurecr.io"
+      - "docker.io"
+      - "ghcr.io"
+      - "quay.io"
+      - "nvcr.io"  # NVIDIA GPU Cloud
+
+  # Service account metadata
+  serviceOptions:
+    additionalMetadata:
+      annotations:
+        prometheus.io/scrape: "true"
+      labels:
+        tenant: ml-team
+        cost-center: "machine-learning"
+        managed-by: "capsule"
+        gpu-enabled: "true"
+
+  # Pod Security Standards - baseline for ML workloads
+  podOptions:
+    additionalMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/audit: baseline
+        pod-security.kubernetes.io/warn: baseline

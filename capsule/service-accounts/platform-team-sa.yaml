@@ -1,0 +1,12 @@
+---
+# Service Account for Platform Team
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-team-user
+  namespace: default
+  annotations:
+    description: "Service account for testing platform-team tenant isolation"
+
+# Note: No explicit RBAC needed - Capsule automatically grants permissions to tenant owners
+# The tenant owns defines clusterRoles: [admin, capsule-namespace-deleter]

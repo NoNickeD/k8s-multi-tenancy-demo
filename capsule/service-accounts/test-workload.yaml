@@ -1,0 +1,67 @@
+---
+# Test Pod - Should succeed with proper resource limits
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-nginx
+  namespace: platform-team-dev
+  labels:
+    app: test
+    tenant: platform-team
+spec:
+  containers:
+  - name: nginx
+    image: docker.io/library/nginx:latest
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    ports:
+    - containerPort: 80
+
+---
+# Test Pod - Should FAIL (exceeds max CPU: 4 cores, max memory: 8Gi)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-oversized
+  namespace: platform-team-dev
+  labels:
+    app: test-fail
+    tenant: platform-team
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+    resources:
+      requests:
+        cpu: "5"
+        memory: "10Gi"
+      limits:
+        cpu: "5"
+        memory: "10Gi"
+
+---
+# Test Pod - Should FAIL (unauthorized registry)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-unauthorized-registry
+  namespace: platform-team-dev
+  labels:
+    app: test-fail
+    tenant: platform-team
+spec:
+  containers:
+  - name: app
+    image: unauthorized-registry.io/app:latest
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"

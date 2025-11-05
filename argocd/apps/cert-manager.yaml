@@ -1,0 +1,113 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    targetRevision: v1.16.1
+    chart: cert-manager
+    helm:
+      values: |
+        # Install CRDs as part of the Helm release
+        crds:
+          enabled: true
+
+        # Deploy to system node pool
+        nodeSelector:
+          nodepool-type: system
+
+        tolerations:
+          - key: CriticalAddonsOnly
+            operator: Exists
+            effect: NoSchedule
+
+        # Resource limits for production
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+
+        # Webhook resource limits
+        webhook:
+          nodeSelector:
+            nodepool-type: system
+
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+
+        # CAInjector resource limits
+        cainjector:
+          nodeSelector:
+            nodepool-type: system
+
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+        # Enable Prometheus metrics
+        prometheus:
+          enabled: true
+          servicemonitor:
+            enabled: true
+            namespace: monitoring
+
+        # Global configuration
+        global:
+          leaderElection:
+            namespace: cert-manager
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+  # Health assessment for cert-manager
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'

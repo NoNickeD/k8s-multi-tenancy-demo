@@ -1,0 +1,17 @@
+# Azure Subscription Configuration
+subscription_id = "YOUR_SUBSCRIPTION_ID_HERE"
+
+# Location
+location = "westeurope"
+
+# Environment
+environment = "demo"
+
+# Kubernetes Version
+kubernetes_version = "1.30"
+
+# Owner Email (for tagging)
+owner_email = "your.email@example.com"
+
+# AKS Admin Users (Azure AD emails with cluster admin access)
+aks_admin_user_emails = ["your.email@example.com"]

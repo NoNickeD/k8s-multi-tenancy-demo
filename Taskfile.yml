@@ -1,0 +1,124 @@
+version: '3'
+
+vars:
+  TOFU_DIR: ./tofu/environments/demo
+  TFVARS_FILE: ../terraform.tfvars
+  CLUSTER_NAME: aks-k8s-multitenancy-westeurope
+  RESOURCE_GROUP: rg-k8s-multitenancy-westeurope
+
+tasks:
+  # Infrastructure tasks
+  infra-init:
+    desc: Initialize OpenTofu
+    dir: "{{.TOFU_DIR}}"
+    cmds:
+      - tofu init
+    silent: true
+
+  infra-plan:
+    desc: Plan AKS infrastructure changes
+    dir: "{{.TOFU_DIR}}"
+    deps: [infra-init]
+    cmds:
+      - tofu plan -var-file={{.TFVARS_FILE}} -out=tfplan
+    silent: true
+
+  infra-apply:
+    desc: Deploy AKS cluster with OpenTofu
+    dir: "{{.TOFU_DIR}}"
+    deps: [infra-plan]
+    cmds:
+      - tofu apply tfplan
+      - echo "Waiting 30 seconds for cluster to stabilize..."
+      - sleep 30
+      - task: infra-get-credentials
+    silent: true
+
+  infra-deploy:
+    desc: Full deployment - init, plan, and apply
+    cmds:
+      - task: infra-apply
+    silent: true
+
+  infra-destroy:
+    desc: Destroy AKS cluster
+    dir: "{{.TOFU_DIR}}"
+    prompt: "This will destroy all infrastructure. Are you sure?"
+    cmds:
+      - tofu destroy -var-file={{.TFVARS_FILE}} -auto-approve
+    silent: true
+
+  infra-get-credentials:
+    desc: Get AKS credentials and configure kubectl
+    cmds:
+      - az aks get-credentials --resource-group {{.RESOURCE_GROUP}} --name {{.CLUSTER_NAME}} --overwrite-existing
+      - echo "Credentials configured. Current context:"
+      - kubectl config current-context
+    silent: true
+
+  # Cluster verification tasks
+  verify-cluster:
+    desc: Verify AKS cluster is running
+    cmds:
+      - echo "Checking cluster connection..."
+      - kubectl cluster-info
+      - echo ""
+      - echo "Checking nodes..."
+      - kubectl get nodes -o wide
+      - echo ""
+      - echo "Checking system pods..."
+      - kubectl get pods -n kube-system
+      - echo ""
+      - echo "Cluster verification complete!"
+    silent: true
+
+  verify-nodepools:
+    desc: Verify all 3 node pools are created
+    cmds:
+      - echo "Checking node pools..."
+      - az aks nodepool list --resource-group {{.RESOURCE_GROUP}} --cluster-name {{.CLUSTER_NAME}} -o table
+      - echo ""
+      - echo "Checking node labels..."
+      - kubectl get nodes --show-labels
+      - echo ""
+      - echo "System nodes (platform):"
+      - kubectl get nodes -l workload-type=platform
+      - echo ""
+      - echo "Capsule nodes (soft-isolation):"
+      - kubectl get nodes -l tenant-mode=soft-isolation
+      - echo ""
+      - echo "vCluster nodes (hard-isolation):"
+      - kubectl get nodes -l tenant-mode=hard-isolation
+    silent: true
+
+  # Helper tasks
+  status:
+    desc: Show cluster status
+    cmds:
+      - echo "Cluster{{":"}} {{.CLUSTER_NAME}}"
+      - echo "Resource Group{{":"}} {{.RESOURCE_GROUP}}"
+      - echo ""
+      - az aks show --resource-group {{.RESOURCE_GROUP}} --name {{.CLUSTER_NAME}} --query "{Provisioning:provisioningState,PowerState:powerState.code,K8sVersion:kubernetesVersion}" -o table
+    silent: true
+
+  nodes:
+    desc: Show all nodes with details
+    cmds:
+      - kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,ROLES:.metadata.labels.nodepool-type,WORKLOAD:.metadata.labels.workload-type,TENANT-MODE:.metadata.labels.tenant-mode,VERSION:.status.nodeInfo.kubeletVersion
+    silent: true
+
+  events-cluster:
+    desc: Show recent cluster events
+    cmds:
+      - kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
+    silent: true
+
+  # Cleanup
+  clean:
+    desc: Clean up OpenTofu files
+    dir: "{{.TOFU_DIR}}"
+    cmds:
+      - rm -f tfplan
+      - rm -f .terraform.lock.hcl
+      - rm -rf .terraform
+    silent: true

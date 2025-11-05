@@ -1,0 +1,11 @@
+---
+# Service Account for Data Team
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-team-user
+  namespace: default
+  annotations:
+    description: "Service account for testing data-team tenant isolation"
+
+# Note: No explicit RBAC needed - Capsule automatically grants permissions to tenant owners

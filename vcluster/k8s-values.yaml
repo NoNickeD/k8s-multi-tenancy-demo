@@ -1,0 +1,141 @@
+# vCluster with Vanilla Kubernetes
+# Best for: Production, full compatibility, enterprise customers
+
+# Control plane configuration
+controlPlane:
+  distro:
+    k8s:
+      enabled: true
+      version: "v1.34.0"  # Full Kubernetes 1.34
+
+  # Backing store - use etcd for production
+  backingStore:
+    etcd:
+      deploy:
+        enabled: true
+        statefulSet:
+          image:
+            tag: "3.5.11-0"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
+          # Node selector for etcd
+          scheduling:
+            nodeSelector:
+              workload-type: vcluster-control-plane
+              tenant-mode: hard-isolation
+
+  # High availability control plane
+  statefulSet:
+    highAvailability:
+      replicas: 3  # 3 API server replicas
+
+    resources:
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+
+    # Node selector - run on vCluster node pool
+    scheduling:
+      nodeSelector:
+        workload-type: vcluster-control-plane
+        tenant-mode: hard-isolation
+
+    # Pod anti-affinity for HA
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: vcluster
+
+# Persistent storage for cluster state
+persistence:
+  volumeClaim:
+    enabled: true
+    size: 20Gi
+    storageClass: managed-premium
+
+# Syncer configuration
+sync:
+  toHost:
+    pods:
+      enabled: true
+      enforceTolerations:
+        - key: "workload-type"
+          operator: "Equal"
+          value: "vcluster-control-plane"
+          effect: "NoSchedule"
+    services:
+      enabled: true
+    endpoints:
+      enabled: true
+    persistentVolumeClaims:
+      enabled: true
+    ingresses:
+      enabled: true
+    secrets:
+      enabled: true
+    configMaps:
+      enabled: true
+
+  fromHost:
+    nodes:
+      enabled: true
+      selector:
+        all: true
+    storageClasses:
+      enabled: true
+    ingressClasses:
+      enabled: true
+
+# Syncer resources
+syncer:
+  replicas: 3  # HA syncer
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+
+# CoreDNS
+coredns:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+# Service exposure
+service:
+  type: LoadBalancer  # Expose API server externally
+
+# Observability
+observability:
+  metrics:
+    proxy:
+      pods: true
+      nodes: true
+
+# Enable audit logging
+policies:
+  podSecurityStandard: baseline
+
+# TLS configuration
+tls:
+  enabled: true

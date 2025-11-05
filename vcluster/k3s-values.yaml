@@ -1,0 +1,87 @@
+# vCluster with K3s - Lightweight Kubernetes Distribution
+# Best for: Development, testing, cost-sensitive workloads
+
+# Control plane configuration
+controlPlane:
+  distro:
+    k3s:
+      enabled: true
+      image:
+        tag: "v1.33.0-k3s1"  # K3s wrapping Kubernetes 1.33
+
+  # Resources for K3s control plane
+  statefulSet:
+    resources:
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+
+    # Node selector - run on vCluster node pool
+    scheduling:
+      nodeSelector:
+        workload-type: vcluster-control-plane
+        tenant-mode: hard-isolation
+
+# Persistent storage for cluster state
+persistence:
+  volumeClaim:
+    enabled: true
+    size: 10Gi
+    storageClass: managed-premium
+
+# Syncer configuration - what gets mirrored to host
+sync:
+  toHost:
+    pods:
+      enabled: true
+    services:
+      enabled: true
+    endpoints:
+      enabled: true
+    persistentVolumeClaims:
+      enabled: true
+    ingresses:
+      enabled: true
+    secrets:
+      enabled: true  # Sync secrets needed by pods
+    configMaps:
+      enabled: true
+
+  fromHost:
+    nodes:
+      enabled: true  # Virtual cluster sees host nodes
+      selector:
+        all: true
+    storageClasses:
+      enabled: true  # Use host storage classes
+    ingressClasses:
+      enabled: true
+
+# CoreDNS in virtual cluster
+coredns:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+# Networking
+networking:
+  replicateServices:
+    toHost:
+      - from: default/*
+        to: default/*
+
+# Observability
+observability:
+  metrics:
+    proxy:
+      pods: true
+      nodes: true

@@ -1,0 +1,136 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 65.1.1
+    helm:
+      releaseName: prometheus
+      values: |
+        # Skip CRDs - they are installed separately via prometheus-operator-crds
+        crds:
+          enabled: false
+
+        # Disable admission webhooks to avoid hook issues
+        prometheusOperator:
+          admissionWebhooks:
+            enabled: false
+          tls:
+            enabled: false
+
+          # Deploy to system node pool
+          nodeSelector:
+            nodepool-type: system
+
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+
+        prometheus:
+          prometheusSpec:
+            # Deploy to system node pool
+            nodeSelector:
+              nodepool-type: system
+
+            tolerations:
+              - key: CriticalAddonsOnly
+                operator: Exists
+                effect: NoSchedule
+
+            retention: 7d
+            retentionSize: "50GB"
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 50Gi
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+
+            # Service monitors for KEDA and demo apps
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+
+        grafana:
+          enabled: true
+          adminPassword: admin  # Change in production!
+          persistence:
+            enabled: true
+            size: 10Gi
+
+          # Deploy to system node pool
+          nodeSelector:
+            nodepool-type: system
+
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+
+          dashboardProviders:
+            dashboardproviders.yaml:
+              apiVersion: 1
+              providers:
+                - name: 'default'
+                  orgId: 1
+                  folder: ''
+                  type: file
+                  disableDeletion: false
+                  editable: true
+                  options:
+                    path: /var/lib/grafana/dashboards/default
+
+          dashboards:
+            default:
+              keda:
+                url: https://raw.githubusercontent.com/kedacore/keda/main/config/grafana/keda-dashboard.json
+
+        alertmanager:
+          enabled: true
+
+          # Deploy to system node pool
+          alertmanagerSpec:
+            nodeSelector:
+              nodepool-type: system
+
+            tolerations:
+              - key: CriticalAddonsOnly
+                operator: Exists
+                effect: NoSchedule
+
+        # Disable kubeProxy metrics (not available on AKS)
+        kubeProxy:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - Replace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
